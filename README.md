@@ -22,7 +22,7 @@ Due to the vast amount of supported formats, features, and innovations inside th
 - Support for split-screen local multiplayer
 - Voice-chat via Opus & Speex
 - Support for hundreds of players on a single server
-- Works on Windows, Linux, OpenBSD... & more
+- Works on Windows, Linux, OpenBSD, **Xbox (UWP/Dev Mode)**... & more
 - New features are added all the time in cooperation with modders
 
 # Contributions

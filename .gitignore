@@ -44,3 +44,15 @@ engine/droid/project.properties
 
 # Flatpak build artifacts
 .flatpak-builder
+
+# UWP build artifacts
+engine/uwp/Debug/
+engine/uwp/Release/
+engine/uwp/ARM64/
+engine/uwp/x64/
+engine/uwp/*.vcxproj.user
+engine/uwp/*.vcxproj.filters
+engine/uwp/.vs/
+engine/uwp/AppPackages/
+engine/uwp/BundleArtifacts/
+engine/uwp/FTEQW_UWP_TemporaryKey.pfx

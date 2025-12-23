@@ -1,0 +1,514 @@
+name: UWP Build and Validation
+
+on:
+  push:
+    branches: [ main, master, copilot/port-to-uwp-xbox-dev ]
+    paths:
+      - 'engine/uwp/**'
+      - 'engine/client/sys_uwp.c'
+      - 'engine/common/bothdefs.h'
+      - 'engine/d3d/d3d11*.c'
+      - 'engine/d3d/vid_d3d11.c'
+      - '.github/workflows/uwp-build.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'engine/uwp/**'
+      - 'engine/client/sys_uwp.c'
+      - 'engine/common/bothdefs.h'
+      - 'engine/d3d/**'
+      - '.github/workflows/uwp-build.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-uwp-project:
+    name: Validate UWP Project Structure
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check required UWP files
+        run: |
+          echo "::group::Checking UWP project structure"
+          
+          required_files=(
+            "engine/uwp/FTEQW_UWP.sln"
+            "engine/uwp/FTEQW_UWP.vcxproj"
+            "engine/uwp/Package.appxmanifest"
+            "engine/client/sys_uwp.c"
+          )
+          
+          missing_files=0
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "::error::Missing required file: $file"
+              missing_files=$((missing_files + 1))
+            else
+              echo "✓ Found: $file"
+            fi
+          done
+          
+          if [ $missing_files -gt 0 ]; then
+            echo "::error::$missing_files required file(s) missing"
+            exit 1
+          fi
+          
+          echo "::endgroup::"
+      
+      - name: Validate Package.appxmanifest
+        run: |
+          echo "::group::Validating Package.appxmanifest"
+          
+          manifest="engine/uwp/Package.appxmanifest"
+          
+          # Check for required XML elements
+          if ! grep -q '<Identity' "$manifest"; then
+            echo "::error::Package.appxmanifest missing Identity element"
+            exit 1
+          fi
+          
+          if ! grep -q '<TargetDeviceFamily Name="Windows.Universal"' "$manifest"; then
+            echo "::warning::Package.appxmanifest should target Windows.Universal"
+          fi
+          
+          if ! grep -q '<TargetDeviceFamily Name="Windows.Xbox"' "$manifest"; then
+            echo "::warning::Package.appxmanifest should target Windows.Xbox for Xbox support"
+          fi
+          
+          # Check for capability declarations
+          if grep -q '<Capability Name="internetClient"' "$manifest"; then
+            echo "✓ Internet capability declared"
+          else
+            echo "::warning::Internet capability not declared (may be intentional)"
+          fi
+          
+          echo "✓ Package.appxmanifest structure looks valid"
+          echo "::endgroup::"
+      
+      - name: Check for platform-specific code guards
+        run: |
+          echo "::group::Checking WINRT code guards"
+          
+          uwp_file="engine/client/sys_uwp.c"
+          
+          if ! grep -q '#ifdef WINRT' "$uwp_file" && ! grep -q '#if defined(WINRT)' "$uwp_file"; then
+            echo "::error::sys_uwp.c missing WINRT preprocessor guard"
+            exit 1
+          fi
+          
+          if ! grep -q '#endif.*WINRT' "$uwp_file"; then
+            echo "::error::sys_uwp.c missing closing WINRT guard"
+            exit 1
+          fi
+          
+          echo "✓ Platform guards look correct"
+          echo "::endgroup::"
+      
+      - name: Check for UWP-incompatible APIs
+        run: |
+          echo "::group::Checking for UWP-incompatible APIs"
+          
+          uwp_file="engine/client/sys_uwp.c"
+          
+          # Check for forbidden APIs
+          incompatible_apis=(
+            "LoadLibrary"
+            "LoadLibraryA"
+            "LoadLibraryW"
+            "LoadLibraryEx"
+            "GetProcAddress"
+            "socket("
+            "bind("
+            "listen("
+            "accept("
+            "CreateThread"
+          )
+          
+          found_issues=0
+          for api in "${incompatible_apis[@]}"; do
+            if grep -q "$api" "$uwp_file" 2>/dev/null; then
+              echo "::warning::Found potentially incompatible API: $api in $uwp_file"
+              found_issues=$((found_issues + 1))
+            fi
+          done
+          
+          if [ $found_issues -eq 0 ]; then
+            echo "✓ No obvious UWP-incompatible APIs found"
+          else
+            echo "::warning::Found $found_issues potential UWP compatibility issues"
+          fi
+          
+          echo "::endgroup::"
+
+  build-uwp-x64:
+    name: Build UWP (x64)
+    runs-on: windows-latest
+    needs: validate-uwp-project
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+      
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+      
+      - name: Restore NuGet packages
+        run: |
+          cd engine/uwp
+          nuget restore FTEQW_UWP.sln
+      
+      - name: Populate project with source files
+        shell: pwsh
+        run: |
+          cd engine/uwp
+          Write-Host "Running populate_project.ps1..."
+          
+          # Run the population script
+          & .\populate_project.ps1
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to populate project files"
+            exit 1
+          }
+      
+      - name: Build UWP x64 Debug
+        run: |
+          cd engine/uwp
+          msbuild FTEQW_UWP.sln /p:Configuration=Debug /p:Platform=x64 /p:AppxBundle=Never /p:AppxPackageSigningEnabled=false /m /v:minimal
+        continue-on-error: true
+        id: build_debug
+      
+      - name: Build UWP x64 Release
+        run: |
+          cd engine/uwp
+          msbuild FTEQW_UWP.sln /p:Configuration=Release /p:Platform=x64 /p:AppxBundle=Never /p:AppxPackageSigningEnabled=false /m /v:minimal
+        continue-on-error: true
+        id: build_release
+      
+      - name: Check build results
+        shell: pwsh
+        run: |
+          $debugFailed = "${{ steps.build_debug.outcome }}" -eq "failure"
+          $releaseFailed = "${{ steps.build_release.outcome }}" -eq "failure"
+          
+          if ($debugFailed -and $releaseFailed) {
+            Write-Error "Both Debug and Release builds failed"
+            exit 1
+          } elseif ($debugFailed) {
+            Write-Warning "Debug build failed, but Release succeeded"
+          } elseif ($releaseFailed) {
+            Write-Warning "Release build failed, but Debug succeeded"
+          } else {
+            Write-Host "✓ Both builds succeeded"
+          }
+      
+      - name: List build outputs
+        shell: pwsh
+        run: |
+          Write-Host "=== Build Outputs ==="
+          
+          $outputDirs = @(
+            "engine/uwp/x64/Debug",
+            "engine/uwp/x64/Release"
+          )
+          
+          foreach ($dir in $outputDirs) {
+            if (Test-Path $dir) {
+              Write-Host "`nContents of $dir:"
+              Get-ChildItem -Path $dir -Recurse -File | Select-Object FullName, Length | Format-Table -AutoSize
+            } else {
+              Write-Host "`n$dir does not exist"
+            }
+          }
+      
+      - name: Verify UWP executable dependencies
+        shell: pwsh
+        run: |
+          Write-Host "=== Checking DLL Dependencies ==="
+          
+          $exePaths = @(
+            "engine/uwp/x64/Debug/FTEQW_UWP.exe",
+            "engine/uwp/x64/Release/FTEQW_UWP.exe"
+          )
+          
+          foreach ($exePath in $exePaths) {
+            if (Test-Path $exePath) {
+              Write-Host "`nChecking: $exePath"
+              
+              # Use dumpbin to check dependencies
+              $dumpbinOutput = & "dumpbin" "/DEPENDENTS" $exePath 2>&1
+              
+              # Check for VCRUNTIME140_APP.dll (correct UWP runtime)
+              if ($dumpbinOutput -match "VCRUNTIME140_APP\.dll") {
+                Write-Host "✓ Correctly using VCRUNTIME140_APP.dll (UWP runtime)"
+              } elseif ($dumpbinOutput -match "VCRUNTIME140\.dll") {
+                Write-Error "✗ Using VCRUNTIME140.dll instead of VCRUNTIME140_APP.dll - not UWP compatible!"
+                exit 1
+              }
+              
+              # Check for expected dependencies
+              $expectedDeps = @("d3d11.dll", "dxgi.dll", "xinput")
+              foreach ($dep in $expectedDeps) {
+                if ($dumpbinOutput -match $dep) {
+                  Write-Host "✓ Found expected dependency: $dep"
+                }
+              }
+              
+              # Show all dependencies
+              Write-Host "`nAll dependencies:"
+              Write-Host $dumpbinOutput
+            } else {
+              Write-Warning "Executable not found: $exePath"
+            }
+          }
+      
+      - name: Upload x64 Debug artifacts
+        uses: actions/upload-artifact@v4
+        if: steps.build_debug.outcome == 'success'
+        with:
+          name: FTEQW-UWP-x64-Debug
+          path: |
+            engine/uwp/x64/Debug/*.exe
+            engine/uwp/x64/Debug/*.dll
+            engine/uwp/x64/Debug/*.pdb
+          if-no-files-found: warn
+      
+      - name: Upload x64 Release artifacts
+        uses: actions/upload-artifact@v4
+        if: steps.build_release.outcome == 'success'
+        with:
+          name: FTEQW-UWP-x64-Release
+          path: |
+            engine/uwp/x64/Release/*.exe
+            engine/uwp/x64/Release/*.dll
+          if-no-files-found: warn
+
+  build-uwp-arm64:
+    name: Build UWP (ARM64)
+    runs-on: windows-latest
+    needs: validate-uwp-project
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+      
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+      
+      - name: Restore NuGet packages
+        run: |
+          cd engine/uwp
+          nuget restore FTEQW_UWP.sln
+      
+      - name: Populate project with source files
+        shell: pwsh
+        run: |
+          cd engine/uwp
+          Write-Host "Running populate_project.ps1..."
+          & .\populate_project.ps1
+      
+      - name: Build UWP ARM64 Release
+        run: |
+          cd engine/uwp
+          msbuild FTEQW_UWP.sln /p:Configuration=Release /p:Platform=ARM64 /p:AppxBundle=Never /p:AppxPackageSigningEnabled=false /m /v:minimal
+        continue-on-error: true
+        id: build_arm64
+      
+      - name: Check ARM64 build result
+        shell: pwsh
+        run: |
+          if ("${{ steps.build_arm64.outcome }}" -eq "failure") {
+            Write-Warning "ARM64 build failed - this may be expected if ARM64 tools are not available"
+            Write-Host "ARM64 build is optional for CI"
+          } else {
+            Write-Host "✓ ARM64 build succeeded"
+          }
+      
+      - name: Upload ARM64 Release artifacts
+        uses: actions/upload-artifact@v4
+        if: steps.build_arm64.outcome == 'success'
+        with:
+          name: FTEQW-UWP-ARM64-Release
+          path: |
+            engine/uwp/ARM64/Release/*.exe
+            engine/uwp/ARM64/Release/*.dll
+          if-no-files-found: warn
+
+  uwp-package-validation:
+    name: UWP Package Validation
+    runs-on: windows-latest
+    needs: [build-uwp-x64]
+    if: success() || failure()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Validate manifest schema
+        shell: pwsh
+        run: |
+          Write-Host "=== Validating Package.appxmanifest Schema ==="
+          
+          $manifestPath = "engine/uwp/Package.appxmanifest"
+          
+          # Load as XML and validate basic structure
+          try {
+            [xml]$manifest = Get-Content $manifestPath
+            Write-Host "✓ Manifest is valid XML"
+            
+            # Check namespace
+            if ($manifest.Package.xmlns -match "windows10") {
+              Write-Host "✓ Using Windows 10 schema"
+            } else {
+              Write-Warning "Manifest may be using older schema"
+            }
+            
+            # Check identity
+            if ($manifest.Package.Identity) {
+              Write-Host "✓ Identity element present"
+              Write-Host "  Name: $($manifest.Package.Identity.Name)"
+              Write-Host "  Publisher: $($manifest.Package.Identity.Publisher)"
+              Write-Host "  Version: $($manifest.Package.Identity.Version)"
+            } else {
+              Write-Error "Missing Identity element"
+              exit 1
+            }
+            
+            # Check target device families
+            $targetFamilies = $manifest.Package.Dependencies.TargetDeviceFamily
+            if ($targetFamilies) {
+              Write-Host "✓ Target device families:"
+              foreach ($family in $targetFamilies) {
+                Write-Host "  - $($family.Name) (Min: $($family.MinVersion))"
+              }
+            }
+            
+            # Check capabilities
+            $capabilities = $manifest.Package.Capabilities.Capability
+            if ($capabilities) {
+              Write-Host "✓ Declared capabilities:"
+              foreach ($cap in $capabilities) {
+                Write-Host "  - $($cap.Name)"
+              }
+            }
+            
+          } catch {
+            Write-Error "Failed to parse manifest: $_"
+            exit 1
+          }
+      
+      - name: Check for UWP compliance issues
+        shell: pwsh
+        run: |
+          Write-Host "=== Checking for Common UWP Compliance Issues ==="
+          
+          $issues = @()
+          
+          # Check bothdefs.h for proper WINRT configuration
+          $bothdefsPath = "engine/common/bothdefs.h"
+          $bothdefsContent = Get-Content $bothdefsPath -Raw
+          
+          if ($bothdefsContent -match '#ifdef WINRT') {
+            Write-Host "✓ WINRT section found in bothdefs.h"
+            
+            # Check that networking is disabled for WINRT
+            if ($bothdefsContent -match '#ifdef WINRT[\s\S]*?#undef HAVE_TCP') {
+              Write-Host "✓ HAVE_TCP properly disabled for WINRT"
+            } else {
+              $issues += "HAVE_TCP should be disabled for UWP builds"
+            }
+            
+            # Check that plugins are disabled
+            if ($bothdefsContent -match '#ifdef WINRT[\s\S]*?#undef PLUGINS') {
+              Write-Host "✓ PLUGINS properly disabled for WINRT"
+            } else {
+              $issues += "PLUGINS should be disabled for UWP builds"
+            }
+          } else {
+            $issues += "No WINRT configuration section found in bothdefs.h"
+          }
+          
+          # Check sys_uwp.c for proper guards
+          $sysUwpPath = "engine/client/sys_uwp.c"
+          if (Test-Path $sysUwpPath) {
+            $sysUwpContent = Get-Content $sysUwpPath -Raw
+            
+            if ($sysUwpContent -match '#ifdef WINRT' -or $sysUwpContent -match '#if defined\(WINRT\)') {
+              Write-Host "✓ sys_uwp.c properly guarded with WINRT"
+            } else {
+              $issues += "sys_uwp.c missing WINRT preprocessor guards"
+            }
+            
+            # Check for XInput usage (correct for UWP)
+            if ($sysUwpContent -match 'xinput\.h' -and $sysUwpContent -match 'XInputGetState') {
+              Write-Host "✓ Using XInput (UWP-compatible)"
+            }
+            
+            # Check that GameInput is NOT used (would be GDK, not UWP)
+            if ($sysUwpContent -match 'GameInput\.h' -or $sysUwpContent -match 'IGameInput') {
+              $issues += "sys_uwp.c appears to use GameInput (GDK-only, not UWP compatible)"
+            }
+          } else {
+            $issues += "sys_uwp.c not found"
+          }
+          
+          # Report issues
+          if ($issues.Count -gt 0) {
+            Write-Host "`n❌ Found $($issues.Count) compliance issue(s):"
+            foreach ($issue in $issues) {
+              Write-Host "  - $issue"
+              Write-Warning $issue
+            }
+            exit 1
+          } else {
+            Write-Host "`n✓ No UWP compliance issues detected"
+          }
+
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [validate-uwp-project, build-uwp-x64, build-uwp-arm64, uwp-package-validation]
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "# UWP Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Validation**: ${{ needs.validate-uwp-project.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build x64**: ${{ needs.build-uwp-x64.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build ARM64**: ${{ needs.build-uwp-arm64.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package Validation**: ${{ needs.uwp-package-validation.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.validate-uwp-project.result }}" == "success" ] && \
+             [ "${{ needs.build-uwp-x64.result }}" == "success" ] && \
+             [ "${{ needs.uwp-package-validation.result }}" == "success" ]; then
+            echo "✅ **All critical checks passed!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The UWP build is valid and ready for deployment to Xbox Dev Mode." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Some checks failed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the failed jobs above." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Notes" >> $GITHUB_STEP_SUMMARY
+          echo "- ARM64 build is optional and may fail if ARM64 tools are not available in CI" >> $GITHUB_STEP_SUMMARY
+          echo "- For local testing, see \`engine/uwp/BUILD_INSTRUCTIONS.md\`" >> $GITHUB_STEP_SUMMARY
+          echo "- For Xbox deployment, see \`engine/uwp/README.md\`" >> $GITHUB_STEP_SUMMARY

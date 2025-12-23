@@ -329,6 +329,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	#endif
 #endif
 #ifdef WINRT
+	//UWP/Xbox Dev Mode restrictions
 	//microsoft do not support winsock any more.
 	#undef HAVE_TCP
 	#undef HAVE_PACKET
@@ -336,11 +337,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	#undef TCPCONNECT	//err...
 	#undef IRCCONNECT	//not happening
 	#undef AVAIL_DSOUND	//yeah, good luck there
-	#undef AVAIL_DINPUT	//nope, not supported.
+	#undef AVAIL_DINPUT	//nope, not supported. Use XInput instead.
 	#undef SV_MASTER	//no socket interface
 	#undef CL_MASTER	//no socket interface
-	#undef MULTITHREAD
+	#undef MULTITHREAD	//UWP threading model is different
 	#undef HEADLESSQUAKE
+	#undef PLUGINS		//UWP doesn't support LoadLibrary for arbitrary DLLs
+	#undef TEXTEDITOR	//limited text input on consoles
+	
+	//Ensure D3D11 is used
+	#ifndef D3D11QUAKE
+		#define D3D11QUAKE
+	#endif
 #endif
 #ifdef ANDROID
 	#define GLESONLY	//should reduce the conditions a little

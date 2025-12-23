@@ -69,8 +69,29 @@ You have the choice of two build systems:
 
 - Make
 - CMake
+- Visual Studio (for Windows/UWP/Xbox)
 
 This guide will show commands for both.
+
+## UWP / Xbox Dev Mode
+
+For building FTEQW for Universal Windows Platform or Xbox consoles in Developer Mode:
+
+	cd engine/uwp
+	# Open FTEQW_UWP.sln in Visual Studio 2019/2022
+	# See engine/uwp/BUILD_INSTRUCTIONS.md for detailed steps
+
+or using the build script:
+
+	cd engine/uwp
+	powershell -ExecutionPolicy Bypass -File populate_project.ps1
+
+### Notes
+
+- Requires Visual Studio with UWP development workload
+- Supports x64 (PC, Xbox One, Series X|S) and ARM64 (Series S|X native)  
+- See `engine/uwp/README.md` for complete documentation
+- Based on community guidance from xbdev.store
 
 ## Easy Build Bot System (Linux)
 

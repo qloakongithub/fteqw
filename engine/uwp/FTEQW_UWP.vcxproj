@@ -138,13 +138,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\client\*.c" />
-    <ClCompile Include="..\common\*.c" />
-    <ClCompile Include="..\d3d\*.c" />
-    <ClCompile Include="..\gl\*.c" />
-    <ClCompile Include="..\http\*.c" />
-    <ClCompile Include="..\qclib\*.c" />
-    <ClCompile Include="..\server\*.c" />
+    <!-- Main platform file -->
+    <ClCompile Include="..\client\sys_uwp.c" />
+    <!-- Note: Additional source files will be auto-discovered by Visual Studio -->
+    <!-- or can be added via the VS UI. The key files are listed in the XDK project -->
+    <!-- See FTEQW_XDK.vcproj for a complete reference list -->
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" />
+    <None Include="UWP_PORTING_GUIDE.md" />
+    <None Include="IMPLEMENTATION_SUMMARY.md" />
+    <None Include="Assets\README.md" />
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">

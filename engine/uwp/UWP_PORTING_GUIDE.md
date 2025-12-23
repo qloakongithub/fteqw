@@ -263,7 +263,7 @@ Access Xbox Device Portal via browser:
 ## References
 
 - [worleydl's UWP Porting Notes](https://wiki.xbdev.store/en/WorleysNotes)
-- [Xbox Dev Mode Resources](https://wiki.xbdev.store/en/HelpfullLinksDev)
+- [Xbox Dev Mode Resources](https://wiki.xbdev.store/en/HelpfulLinksDev)
 - [Microsoft UWP Documentation](https://docs.microsoft.com/en-us/windows/uwp/)
 - [Xbox Developer Mode](https://docs.microsoft.com/en-us/windows/uwp/xbox-apps/devkit-activation)
 - [aerisarn's Mesa-UWP](https://github.com/aerisarn/mesa-uwp)

@@ -59,7 +59,7 @@ This directory contains the Visual Studio project files for building FTEQW for U
 ### Supported
 
 - D3D11 rendering
-- Xbox controller input via GameInput API
+- Xbox controller input via XInput API
 - Local file storage in app data folder
 - Basic audio output
 - Xbox Live integration (via system)
@@ -95,7 +95,7 @@ To add game data (PAK files):
 
 ## Input
 
-Xbox controllers are automatically detected via GameInput API. The following buttons are mapped:
+Xbox controllers are automatically detected via XInput API. The following buttons are mapped:
 
 - Left Stick: Movement
 - Right Stick: Look
@@ -138,10 +138,10 @@ Xbox controllers are automatically detected via GameInput API. The following but
 
 - [UWP App Development](https://docs.microsoft.com/en-us/windows/uwp/)
 - [Xbox Development](https://docs.microsoft.com/en-us/windows/uwp/xbox-apps/)
-- [GameInput API](https://docs.microsoft.com/en-us/gaming/gdk/_content/gc/input/overviews/input-overview)
+- [XInput API](https://docs.microsoft.com/en-us/windows/win32/xinput/xinput-game-controller-apis-portal)
 - [Xbox Dev Mode](https://www.xbdev.store) - Community resources
 - [Worley's Notes](https://wiki.xbdev.store/en/WorleysNotes) - Xbox Dev Mode development tips
-- [Helpful Links](https://wiki.xbdev.store/en/HelpfullLinksDev) - Additional Xbox development resources
+- [Helpful Links](https://wiki.xbdev.store/en/HelpfulLinksDev) - Additional Xbox development resources
 
 ## Contributing
 

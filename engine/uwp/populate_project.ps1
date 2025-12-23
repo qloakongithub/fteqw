@@ -128,10 +128,13 @@ if (Test-Path $projectFile) {
     } else {
         Write-Host "Error: Could not find ItemGroup section to replace" -ForegroundColor Red
         Write-Host "You may need to manually add files via Visual Studio" -ForegroundColor Yellow
+        exit 1
     }
 } else {
     Write-Host "Error: Project file not found: $projectFile" -ForegroundColor Red
+    exit 1
 }
 
 Write-Host ""
 Write-Host "Done!" -ForegroundColor Green
+exit 0

@@ -170,13 +170,16 @@ jobs:
           cd engine/uwp
           Write-Host "Running populate_project.ps1..."
           
-          # Run the population script
+          # Run the population script and capture exit code
           & .\populate_project.ps1
+          $exitCode = $LASTEXITCODE
           
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to populate project files"
+          if ($exitCode -ne 0) {
+            Write-Error "Failed to populate project files (exit code: $exitCode)"
             exit 1
           }
+          
+          Write-Host "Project files populated successfully"
       
       - name: Build UWP x64 Debug
         run: |
@@ -317,7 +320,17 @@ jobs:
         run: |
           cd engine/uwp
           Write-Host "Running populate_project.ps1..."
+          
+          # Run the population script and capture exit code
           & .\populate_project.ps1
+          $exitCode = $LASTEXITCODE
+          
+          if ($exitCode -ne 0) {
+            Write-Error "Failed to populate project files (exit code: $exitCode)"
+            exit 1
+          }
+          
+          Write-Host "Project files populated successfully"
       
       - name: Build UWP ARM64 Release
         run: |

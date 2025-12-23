@@ -209,9 +209,10 @@ void Sys_mkdir(const char *path)
 	// For now, stub it out
 }
 
-void Sys_rmdir(const char *path)
+qboolean Sys_rmdir(const char *path)
 {
 	// UWP filesystem restriction
+	return false;
 }
 
 qboolean Sys_remove(const char *path)
@@ -242,7 +243,7 @@ void Sys_Clipboard_PasteText(clipboardtype_t cbt, void (*callback)(void *cb, cha
 	callback(ctx, clipboard_buffer);
 }
 
-void Sys_SaveClipboard(clipboardtype_t cbt, char *text)
+void Sys_SaveClipboard(clipboardtype_t cbt, const char *text)
 {
 	Q_strncpyz(clipboard_buffer, text, SYS_CLIPBOARD_SIZE);
 }
@@ -361,7 +362,7 @@ void INS_EnumerateDevices(void *ctx, void(*callback)(void *ctx, const char *type
 	}
 }
 
-void INS_SetupControllerAudioDevices(void)
+void INS_SetupControllerAudioDevices(qboolean enabled)
 {
 	// Xbox controllers can have audio (headsets)
 	// Not implemented yet

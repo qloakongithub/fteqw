@@ -93,7 +93,7 @@ LONG CDAudio_MessageHandler(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 //shell32 stuff that doesn't exist in win95
 #define COBJMACROS
 
-#ifndef _XBOX
+#if !defined(_XBOX) && !defined(WINRT)
 #include <shlobj.h>
 #include <shellapi.h>
 extern LPITEMIDLIST (STDAPICALLTYPE *pSHBrowseForFolderW)(LPBROWSEINFOW lpbi);
